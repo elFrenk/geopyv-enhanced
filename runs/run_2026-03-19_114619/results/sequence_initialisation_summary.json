@@ -1,0 +1,55 @@
+{
+  "sequence_type": "Sequence",
+  "image_dir": "/home/franc_unix/projects/geopyv-enhanced/runs/run_2026-03-19_114619/frames",
+  "initialised": true,
+  "boundary_info": {
+    "width": 4096,
+    "height": 3000,
+    "nodes": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        4095.0,
+        0.0
+      ],
+      [
+        4095.0,
+        2999.0
+      ],
+      [
+        0.0,
+        2999.0
+      ]
+    ]
+  },
+  "inferred_common_name": "IMG_",
+  "inferred_file_format": ".jpg",
+  "data_keys": [
+    "type",
+    "ID",
+    "solved",
+    "unsolvable",
+    "calibrated",
+    "meshes",
+    "mesh_settings",
+    "file_settings"
+  ],
+  "file_settings": {
+    "image_dir": "/home/franc_unix/projects/geopyv-enhanced/runs/run_2026-03-19_114619/frames/",
+    "common_name": "IMG_",
+    "file_format": ".jpg",
+    "save_by_reference": false,
+    "mesh_dir": "/home/franc_unix/projects/geopyv-enhanced/runs/run_2026-03-19_114619/results/"
+  },
+  "image_count_detected_by_geopyv": 19,
+  "first_images": [
+    "IMG_1062.jpg",
+    "IMG_1063.jpg",
+    "IMG_1064.jpg",
+    "IMG_1065.jpg",
+    "IMG_1066.jpg"
+  ],
+  "boundary_shape": "Path"
+}

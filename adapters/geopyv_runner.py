@@ -5,8 +5,8 @@ from pathlib import Path
 import json
 import re
 from collections import Counter
+import os
 
-import cv2
 import numpy as np
 
 
@@ -53,20 +53,14 @@ class GeopyvRunner:
             )
 
         stems = [p.stem for p in same_ext_files[:2]]
-
-        # Take everything before the trailing number block.
         prefixes = []
         for stem in stems:
             m = re.match(r"^(.*?)(\d+)$", stem)
-            if m:
-                prefixes.append(m.group(1))
-            else:
-                prefixes.append(stem)
+            prefixes.append(m.group(1) if m else stem)
 
         if prefixes[0] == prefixes[1]:
             common_name = prefixes[0]
         else:
-            # Fallback: longest common prefix
             a, b = prefixes[0], prefixes[1]
             i = 0
             while i < min(len(a), len(b)) and a[i] == b[i]:
@@ -80,47 +74,92 @@ class GeopyvRunner:
 
         return common_name, file_format
 
-    def _detect_first_frame(self, frames_dir: Path, common_name: str, file_format: str) -> Path:
-        candidates = sorted(frames_dir.glob(f"{common_name}*{file_format}"))
-        if len(candidates) < 2:
-            raise FileNotFoundError(
-                f"Expected at least 2 frames matching {common_name}*{file_format} in {frames_dir}"
-            )
-        return candidates[0]
+    @staticmethod
+    def _running_in_wsl() -> bool:
+        try:
+            return "microsoft" in Path("/proc/version").read_text(encoding="utf-8").lower()
+        except Exception:
+            return False
 
-    def _build_full_image_boundary(self, frame_path: Path):
+    def _manual_setup(self, first_image_path: Path):
         import geopyv as gp
+        import cv2
 
-        image = cv2.imread(str(frame_path), cv2.IMREAD_GRAYSCALE)
+        # ==========================================================
+        # MANUAL PARAMETERS TO EDIT
+        # Coordinates are in image pixels: [x, y]
+        # ==========================================================
+
+        image = cv2.imread(str(first_image_path), cv2.IMREAD_COLOR)
         if image is None:
-            raise RuntimeError(f"Could not read frame: {frame_path}")
+            raise RuntimeError(f"Unable to read first image: {first_image_path}")
 
         height, width = image.shape[:2]
+        min_dim = min(height, width)
+        if min_dim < 100:
+            raise RuntimeError(
+                f"Image resolution too small for robust geopyv solve ({width}x{height})."
+            )
 
-        nodes = np.array(
-            [
-                [0.0, 0.0],
-                [width - 1.0, 0.0],
-                [width - 1.0, height - 1.0],
-                [0.0, height - 1.0],
-            ],
+        margin_x = max(20.0, width * 0.10)
+        margin_y = max(20.0, height * 0.10)
+
+        x0 = margin_x
+        x1 = max(margin_x + 20.0, width - margin_x)
+        y0 = margin_y
+        y1 = max(margin_y + 20.0, height - margin_y)
+
+        boundary_nodes = np.asarray(
+            [[x0, y0], [x0, y1], [x1, y1], [x1, y0]],
             dtype=float,
         )
 
+        seed_coord = np.asarray([(x0 + x1) / 2.0, (y0 + y1) / 2.0], dtype=float)
+
+        template_radius = int(max(10, min(50, min_dim // 25)))
+        target_nodes = int(max(80, min(220, (width * height) // 90000)))
+        seed_tolerance = 0.6
+        tolerance = 0.5
+
+        # Optional exclusion regions inside the valid domain.
+        exclusion_objs = []
+        # Example:
+        # exclusion_objs.append(
+        #     gp.geometry.region.Circle(
+        #         centre=np.asarray([2500.0, 1600.0]),
+        #         radius=120.0,
+        #         size=20.0,
+        #         option="F",
+        #         hard=True,
+        #     )
+        # )
+
         boundary_obj = gp.geometry.region.Path(
-            nodes=nodes,
-            option="F",
-            hard=True,
-            compensate=True,
+            nodes=boundary_nodes,
+            hard=False,
         )
 
-        return boundary_obj, {"width": int(width), "height": int(height), "nodes": nodes.tolist()}
+        template = gp.templates.Circle(template_radius)
+
+        setup = {
+            "image_width": int(width),
+            "image_height": int(height),
+            "boundary_nodes": boundary_nodes,
+            "boundary_obj": boundary_obj,
+            "exclusion_objs": exclusion_objs,
+            "seed_coord": seed_coord,
+            "template": template,
+            "template_radius": template_radius,
+            "target_nodes": target_nodes,
+            "seed_tolerance": seed_tolerance,
+            "tolerance": tolerance,
+        }
+        return setup
 
     def initialise_sequence(
         self,
         frames_dir: Path,
         *,
-        target_nodes: int = 1000,
         save_by_reference: bool = False,
     ):
         import geopyv as gp
@@ -131,38 +170,92 @@ class GeopyvRunner:
 
         image_files = self._list_image_candidates(frames_dir)
         common_name, file_format = self._infer_common_name_and_format(image_files)
-        first_frame = self._detect_first_frame(frames_dir, common_name, file_format)
-        boundary_obj, boundary_info = self._build_full_image_boundary(first_frame)
+        setup = self._manual_setup(image_files[0])
 
         sequence = gp.sequence.Sequence(
             image_dir=str(frames_dir),
             common_name=common_name,
             file_format=file_format,
-            target_nodes=target_nodes,
-            boundary_obj=boundary_obj,
-            exclusion_objs=[],
+            target_nodes=setup["target_nodes"],
+            boundary_obj=setup["boundary_obj"],
+            exclusion_objs=setup["exclusion_objs"],
             save_by_reference=save_by_reference,
             mesh_dir=str(self.results_dir),
             ID="pipeline_sequence",
         )
-        return sequence, boundary_info, common_name, file_format
+        return sequence, setup, common_name, file_format
 
-    def run(self, frames_dir: Path) -> RunResult:
+    def run(self, frames_dir: Path, *, force_conservative_mode: bool = True) -> RunResult:
         frames_dir = Path(frames_dir)
 
-        sequence, boundary_info, common_name, file_format = self.initialise_sequence(frames_dir)
+        sequence, setup, common_name, file_format = self.initialise_sequence(frames_dir)
+
+        # Conservative defaults reduce native crashes under WSL/high thread pressure.
+        conservative_mode = force_conservative_mode or self._running_in_wsl()
+        sequential = bool(conservative_mode)
+        sync = not sequential
+        max_iterations = 20 if conservative_mode else 30
+        adaptive_iterations = 0 if conservative_mode else 1
+        alpha = 0.4 if conservative_mode else 0.5
+
+        if conservative_mode:
+            os.environ.setdefault("OMP_NUM_THREADS", "1")
+            os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+            os.environ.setdefault("MKL_NUM_THREADS", "1")
+            os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+
+        solved = sequence.solve(
+            seed_coord=setup["seed_coord"],
+            template=setup["template"],
+            max_norm=1e-5,
+            max_iterations=max_iterations,
+            adaptive_iterations=adaptive_iterations,
+            method="ICGN",
+            mesh_order=2,
+            subset_order=1,
+            tolerance=setup["tolerance"],
+            seed_tolerance=setup["seed_tolerance"],
+            alpha=alpha,
+            guide=True,
+            override=False,
+            sequential=sequential,
+            sync=sync,
+            dense=False,
+        )
 
         summary = {
             "sequence_type": type(sequence).__name__,
             "image_dir": str(frames_dir),
             "initialised": True,
-            "boundary_info": boundary_info,
+            "solved": bool(solved),
             "inferred_common_name": common_name,
             "inferred_file_format": file_format,
+            "boundary_nodes": setup["boundary_nodes"].tolist(),
+            "seed_coord": setup["seed_coord"].tolist(),
+            "template_radius": int(setup["template_radius"]),
+            "target_nodes": int(setup["target_nodes"]),
+            "seed_tolerance": float(setup["seed_tolerance"]),
+            "tolerance": float(setup["tolerance"]),
+            "exclusion_count": len(setup["exclusion_objs"]),
+            "image_width": setup["image_width"],
+            "image_height": setup["image_height"],
+            "conservative_mode": conservative_mode,
+            "sequential": sequential,
+            "sync": sync,
+            "max_iterations": max_iterations,
+            "adaptive_iterations": adaptive_iterations,
+            "alpha": alpha,
         }
 
         if hasattr(sequence, "data"):
             summary["data_keys"] = list(sequence.data.keys())
+            summary["sequence_data"] = {
+                "solved": sequence.data.get("solved"),
+                "unsolvable": sequence.data.get("unsolvable"),
+                "sync": sequence.data.get("sync"),
+                "dense": sequence.data.get("dense"),
+            }
+
             file_settings = sequence.data.get("file_settings", {})
             summary["file_settings"] = {
                 "image_dir": file_settings.get("image_dir"),
@@ -177,16 +270,17 @@ class GeopyvRunner:
                 summary["image_count_detected_by_geopyv"] = len(images)
                 summary["first_images"] = list(images[:5])
 
-            mesh_settings = sequence.data.get("mesh_settings", {})
-            boundary = mesh_settings.get("boundary_obj")
-            if boundary is not None and hasattr(boundary, "data"):
-                summary["boundary_shape"] = boundary.data.get("shape")
-
-        summary_file = self.results_dir / "sequence_initialisation_summary.json"
+        summary_file = self.results_dir / "sequence_solve_summary.json"
         summary_file.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
+        message = (
+            "Geopyv sequence solved successfully."
+            if solved
+            else "Geopyv sequence initialised but solve did not complete successfully."
+        )
+
         return RunResult(
-            success=True,
-            message="Geopyv sequence initialised successfully with automatic image boundary.",
+            success=bool(solved),
+            message=message,
             results_dir=self.results_dir,
         )

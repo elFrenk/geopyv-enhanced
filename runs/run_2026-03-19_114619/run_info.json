@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-03-19T11:46:20.931855",
+  "input_path": "/mnt/c/Users/franc/Desktop/frames",
+  "input_type": "image_folder",
+  "frames_dir": "/home/franc_unix/projects/geopyv-enhanced/runs/run_2026-03-19_114619/frames",
+  "frame_count": 19,
+  "success": true,
+  "message": "Geopyv sequence initialised successfully with automatic image boundary.",
+  "results_dir": "/home/franc_unix/projects/geopyv-enhanced/runs/run_2026-03-19_114619/results"
+}

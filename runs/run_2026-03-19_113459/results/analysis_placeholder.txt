@@ -1,0 +1,2 @@
+Pipeline reached geopyv runner successfully.
+Frames directory: /home/franc_unix/projects/geopyv-enhanced/runs/run_2026-03-19_113459/frames

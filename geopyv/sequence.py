@@ -1300,7 +1300,7 @@ class Sequence(SequenceBase):
                 1, : 6 * min(self._mesh_order, self._subset_order)
             ]
             return _seed_displacement
-        return None
+        return np.zeros(2)
 
     def _target_update(self, _g_index, _g_img):
         _g_index += 1

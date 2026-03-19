@@ -1,0 +1,4 @@
+[path] Windows path detected under WSL.
+[path] Converted: C:\Users\franc\Desktop\frames  ->  /mnt/c/Users/franc/Desktop/frames
+[37mSolving for image pair 1062-1063.[0m
+Solving initial mesh |▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉▉| 123/123 [100%] in 0.4s (313.73/s) 

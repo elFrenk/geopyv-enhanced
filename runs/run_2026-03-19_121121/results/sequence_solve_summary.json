@@ -1,0 +1,77 @@
+{
+  "sequence_type": "Sequence",
+  "image_dir": "/home/franc_unix/projects/geopyv-enhanced/runs/run_2026-03-19_121121/frames",
+  "initialised": true,
+  "solved": false,
+  "boundary_info": {
+    "width": 4096,
+    "height": 3000,
+    "margin": 32,
+    "nodes": [
+      [
+        32.0,
+        32.0
+      ],
+      [
+        4063.0,
+        32.0
+      ],
+      [
+        4063.0,
+        2967.0
+      ],
+      [
+        32.0,
+        2967.0
+      ]
+    ]
+  },
+  "seed_info": {
+    "mode": "image_center_clipped_inside_margin",
+    "x": 2048.0,
+    "y": 1500.0,
+    "width": 4096,
+    "height": 3000,
+    "margin": 32
+  },
+  "inferred_common_name": "IMG_",
+  "inferred_file_format": ".jpg",
+  "template_radius": 20,
+  "boundary_margin": 32,
+  "target_nodes": 250,
+  "data_keys": [
+    "type",
+    "ID",
+    "solved",
+    "unsolvable",
+    "calibrated",
+    "meshes",
+    "mesh_settings",
+    "file_settings",
+    "sync",
+    "dense",
+    "subset_size_limits",
+    "override",
+    "override_log"
+  ],
+  "sequence_data": {
+    "solved": false,
+    "unsolvable": true,
+    "sync": true,
+    "dense": false
+  },
+  "file_settings": {
+    "image_dir": "/home/franc_unix/projects/geopyv-enhanced/runs/run_2026-03-19_121121/frames/",
+    "common_name": "IMG_",
+    "file_format": ".jpg",
+    "save_by_reference": false,
+    "mesh_dir": "/home/franc_unix/projects/geopyv-enhanced/runs/run_2026-03-19_121121/results/"
+  },
+  "image_count_detected_by_geopyv": 3,
+  "first_images": [
+    "IMG_1062.jpg",
+    "IMG_1063.jpg",
+    "IMG_1064.jpg"
+  ],
+  "boundary_shape": "Path"
+}
